@@ -14,11 +14,12 @@ Make sure you have the following software already installed:
 ```
 cargo install --path .
 export PATH="$HOME/.cargo/bin:$PATH"
+fa_tool check subtitle.ass
 fa_tool run subtitle.ass
 ```
 ___
 
-### **Notes**:
+### **Notes:**
 
 + This programm does **NOT** check whether the required fonts are installed.
 It only parses the subtitle file, asks fontconfig for a matching font and muxes them into one file.
@@ -26,3 +27,11 @@ It only parses the subtitle file, asks fontconfig for a matching font and muxes 
     * This also affects mpv. If your subtitle file doesn't start at time 0, this will lead to playback issues. (mpv will always skips to the beginning of the file)
     * Hint: mux a video track into the container or play the subtitle file externally
 + ffmpeg is run with `overwrite` disabled
+
+___
+
+### **Problems:**
+
+Tests have revealed that fontconfig's `fc-match` isn't as flawless as initially thought. Fonts with a lot of complex styles rarely get matched correctly. You can manually check the matches using the `check` option.
+
+___

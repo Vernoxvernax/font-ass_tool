@@ -25,16 +25,29 @@ fn main() {
         .author("Vernox Vernax")
         .subcommand(
             Command::new("run")
-                .short_flag('r')
-                .long_flag("run")
-                .about("Analyze a subtitle file written in ASS, and mux the required fonts into a matroska container.")
-                .arg(
-                    Arg::new("file")
-                        .help("list of files or folders")
-                        .required(true)
-                        .action(ArgAction::Set)
-                        .num_args(1..)
-                )
+            .short_flag('r')
+            .long_flag("run")
+            .about("Analyze a subtitle file written in ASS, and mux the required fonts into a matroska container.")
+            .arg(
+                Arg::new("file")
+                    .help("list of files or folders")
+                    .required(true)
+                    .action(ArgAction::Set)
+                    .num_args(1..)
+            )
+        )
+        .subcommand(
+            Command::new("check")
+            .short_flag('c')
+            .long_flag("check")
+            .about("Analyze a subtitle file written in ASS, and output the best matches in the console.")
+            .arg(
+                Arg::new("file")
+                .help("list of files or folders")
+                .required(true)
+                .action(ArgAction::Set)
+                .num_args(1..)
+            )
         )
     .get_matches();
     match matches.subcommand() {
@@ -44,14 +57,27 @@ fn main() {
             let raw_files = to_file_list(files);
             let ass_files = deserialize(raw_files.clone());
             for (file, name) in ass_files.iter().zip(raw_files.iter()) {
-                remux_this(find_files(file.clone()), name.clone()).expect("Failed to remux file.");
+                remux_this(find_font_files(file.clone()), name.clone()).expect("Failed to remux file.");
+            }
+        },
+        Some(("check", check_matches)) => {
+            let args = check_matches.get_many::<String>("file");
+            let files = args.unwrap().map(|s| s.to_string()).collect::<Vec<_>>();
+            let raw_files = to_file_list(files);
+            let ass_files = deserialize(raw_files.clone());
+            for (file, name) in ass_files.iter().zip(raw_files.iter()) {
+                println!("{}:", name.clone());
+                for (font_file, font_name) in find_font_files(file.clone()).fonts.iter().zip(file.fonts.iter()) {
+                    println!("  {} => {}", font_name, font_file);
+                };
+                println!("");
             }
         }
         _ => unreachable!(),
     }
 }
 
-fn find_files(file: &AssFile) -> AssFile {
+fn find_font_files(file: &AssFile) -> AssFile {
     let mut fonts: Vec<String> = vec![];
     for font in &file.fonts {
         let font_cstr = CString::new(font.clone()).unwrap();
@@ -85,6 +111,8 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
         cmd = cmd.to_owned() + " -attach " + font_files.as_str();
         if font_files.ends_with(".ttf\0") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-font";
+        } else if font_files.ends_with(".otf\0") {
+            cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-font-opentype";
         }
         track_index += 1;
         duppl_check.push_str(&font_files);
