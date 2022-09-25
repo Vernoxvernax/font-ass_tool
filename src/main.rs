@@ -109,9 +109,9 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
             continue
         }
         cmd = cmd.to_owned() + " -attach " + font_files.as_str();
-        if font_files.ends_with(".ttf\0") {
+        if font_files.ends_with(".ttf") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-font";
-        } else if font_files.ends_with(".otf\0") {
+        } else if font_files.ends_with(".otf") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-font-opentype";
         }
         track_index += 1;
@@ -134,7 +134,6 @@ fn deserialize(files: Vec<String>) -> Vec<AssFile> {
     let mut deserialized_files: Vec<AssFile> = vec![];
     for x in files {
         let file = fs::read_to_string(&x).unwrap();
-        // println!("{:?}", file);
         let ass: Result<AssFile, error::Error> = AssFile::get_fonts(file);
         if ass.is_ok() {
             deserialized_files.append(&mut vec![ass.unwrap()]);
