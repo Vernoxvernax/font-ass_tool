@@ -80,7 +80,7 @@ fn main() {
 fn find_font_files(file: &AssFile) -> AssFile {
     let mut fonts: Vec<String> = vec![];
     for font in &file.fonts {
-        let font_cstr = CString::new(font.clone()).unwrap();
+        let font_cstr = CString::new(font.replace("@", "").clone()).unwrap();
         unsafe {
             let pattern = FcNameParse(font_cstr.as_ptr() as *mut FcChar8);
             FcConfigSubstitute(null_mut(), pattern, FcMatchPattern);
