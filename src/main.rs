@@ -91,7 +91,7 @@ fn find_font_files(file: &AssFile) -> AssFile {
                 let pattern2 = CString::new("%{file}").unwrap();
                 let fonting = FcPatternFormat(matched, pattern2.as_ptr() as *const u8);
                 let string = CStr::from_ptr(fonting as *const c_char).to_bytes_with_nul();
-                fonts.append(&mut vec![from_utf8_unchecked(string).to_string().trim().to_string()]);
+                fonts.append(&mut vec![from_utf8_unchecked(string).replace("\0", "").trim().to_string()]);
             } else {
                 panic!("No match has been found for {}", font);
             }
@@ -118,7 +118,7 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
         duppl_check.push_str(&font_files);
     };
     cmd = cmd.to_owned() + " " + name.as_str() + ".mkv -n";
-    let arg = format!("{}", cmd).replace("\0", "");
+    let arg = format!("{}", cmd);
     let args: Vec<&str> = arg.split(" ").collect();
     let result = std::process::Command::new("ffmpeg").args(args).output().unwrap();
     match result.status.success() {
