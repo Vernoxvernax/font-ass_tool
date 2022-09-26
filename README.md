@@ -33,5 +33,6 @@ ___
 ### **Problems:**
 
 Tests have revealed that fontconfig's `fc-match` isn't as flawless as initially thought. Fonts with a lot of complex styles rarely get matched correctly. You can manually check the matches using the `check` option.
+In `0.1.3` I've implemented a few loops that basically trim common words like `Bold` or `Light` off the fontnames if the matched fontpath equals the one of the default one.
 
 ___

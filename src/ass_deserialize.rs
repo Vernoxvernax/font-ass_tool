@@ -1,9 +1,16 @@
 use std::vec;
 use crate::error::Error;
 
+#[derive(PartialEq, Clone)]
+pub struct AssFont {
+    pub facename: String,
+    pub bold: bool,
+    pub italic: bool,
+    pub path: String
+}
 
 pub struct AssFile {
-    pub fonts: Vec<String>
+    pub fonts: Vec<AssFont>
 }
 
 impl AssFile {
@@ -57,50 +64,96 @@ impl AssFile {
         }
     }
 
-    fn trim_to_fonts(styles: Vec<String>, events: Vec<String>) -> Result<Vec<String>, Error> {
-        let mut fonts: Vec<String> = vec![];
+    fn trim_to_fonts(styles: Vec<String>, events: Vec<String>) -> Result<Vec<AssFont>, Error> {
+        let mut fonts: Vec<AssFont> = vec![];
         
         for line in styles {
             let mut font = String::new();
-            let mut comma_ed: bool = false;
+            let mut bold: bool = false;
+            let mut italic: bool = false;
+            let mut comma_ed: u8 = 0;
             for ch in line.trim_start_matches("Style: ").chars() {
                 if ch == ',' {
-                    if comma_ed {
-                        break
-                    } else {
-                        comma_ed = true
-                    }
+                    comma_ed += 1;
                     continue
                 }
-                if comma_ed {
+                if comma_ed == 1 {
                     font.push_str(ch.to_string().as_str());
+                } else if comma_ed == 7 {
+                    if ch == '0' {
+                        bold = false;
+                    } else {
+                        bold = true;
+                    }
+                } else if comma_ed == 8 {
+                    if ch == '0' {
+                        italic = false;
+                    } else {
+                        italic = true;
+                    }
                 }
             }
-            if ! fonts.contains(&font.clone()) {
-                fonts.append(&mut vec![font.clone()]);
+            let assfont: AssFont = AssFont {
+                facename: font,
+                bold,
+                italic,
+                path: "".to_string()
+            };
+            if ! fonts.contains(&assfont) {
+                fonts.append(&mut vec![assfont]);
             }
         }
 
         for line in events {
             let mut font = String::new();
+            let mut bold: bool = false;
+            let mut bold_check: bool = false;
+            let mut italic: bool = false;
+            let mut italic_check: bool = false;
             let mut styled: bool = false;
             let mut read_tag: bool = false;
             let mut record: bool = false;
             for ch in line.chars() {
-                if read_tag && ch == 'f' {
+                if italic_check || bold_check {
+                    if italic_check {
+                        if ch == '0' {
+                            italic = false
+                        } else if ch == '1' {
+                            italic = true
+                        }
+                    } else {
+                        if ch == '0' {
+                            bold = false
+                        } else if ch == '1' {
+                            bold = true
+                        }
+                    }
+                    (italic_check, bold_check) = (false, false);
                     continue
-                } if read_tag && ch == 'n' {
+                } else if read_tag && ch == 'f' {
+                    continue
+                } else if read_tag && ch == 'n' {
                     record = true;
                     read_tag = false;
                     continue;
+                } else if read_tag && ch == 'i' {
+                    italic_check = true
+                } else if read_tag && ch == 'b' {
+                    bold_check = true
                 } else {
                     read_tag = false;
                 }
                 if ch == '{' || ch == '}' {
                     if styled {
                         if ! font.is_empty() {
-                            if ! fonts.contains(&font.clone()) {
-                                fonts.append(&mut vec![font.clone()]);
+                            let assfont = AssFont {
+                                facename: font.clone(),
+                                bold,
+                                italic,
+                                path: "".to_string()
+                            };
+                            if ! fonts.contains(&assfont) {
+                                fonts.append(&mut vec![assfont]);
                             }
                             font.clear()
                         }
