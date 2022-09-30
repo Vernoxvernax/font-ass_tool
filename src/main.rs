@@ -57,7 +57,9 @@ fn main() {
             let raw_files = to_file_list(files);
             let ass_files = deserialize(raw_files.clone());
             for (file, name) in ass_files.iter().zip(raw_files.iter()) {
-                remux_this(find_font_files(file.clone()), name.clone()).expect("Failed to remux file.");
+                if remux_this(find_font_files(file.clone()), name.clone()).is_err() {
+                    println!("Failed to write {}:\n{:?}", name, file.fonts);
+                };
             }
         },
         Some(("check", check_matches)) => {
@@ -105,12 +107,14 @@ fn find_font_files(file: &AssFile) -> AssFile {
                     || font_name.ends_with("Bold")
                     || font_name.ends_with("Italic")
                     || font_name.ends_with("Semi")
+                    || font_name.ends_with("Extra")
                     || font_name.ends_with("Light") {
                         font_name = font_name.trim_end_matches("Condensed").trim().to_string();
                         font_name = font_name.trim_end_matches("Bold").trim().to_string();
                         font_name = font_name.trim_end_matches("Semi").trim().to_string();
                         font_name = font_name.trim_end_matches("Italic").trim().to_string();
                         font_name = font_name.trim_end_matches("Light").trim().to_string();
+                        font_name = font_name.trim_end_matches("Extra").trim().to_string();
                     } else {
                         fonts.append(&mut vec![assfont]);
                         break
@@ -148,7 +152,7 @@ fn get_fallback_font() -> String {
 fn remux_this(file: AssFile, name: String) -> Result<(), String> {
     if Path::new(format!("{}.mkv", name).as_str()).exists() {
         println!("{}.mkv already exists.", name);
-        std::process::exit(0x0100);
+        return Ok(());
     }
     let mut duppl_check = String::new();
     let mut cmd = "-i ".to_owned() + name.as_str();
@@ -162,6 +166,8 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-font";
         } else if assfont.path.ends_with(".otf") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-font-opentype";
+        } else if assfont.path.ends_with("ttc") {
+            cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-collection";
         }
         track_index += 1;
         duppl_check.push_str(&assfont.path);

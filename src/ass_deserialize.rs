@@ -1,7 +1,7 @@
 use std::vec;
 use crate::error::Error;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct AssFont {
     pub facename: String,
     pub bold: bool,
@@ -9,6 +9,7 @@ pub struct AssFont {
     pub path: String
 }
 
+#[derive(Debug)]
 pub struct AssFile {
     pub fonts: Vec<AssFont>
 }
@@ -52,7 +53,7 @@ impl AssFile {
                 continue
             }
             if header.is_some() {
-                if ! line.is_empty() && ! line.starts_with("Format:") {
+                if ! line.is_empty() && ! line.starts_with("Format:") && ! line.starts_with("Comment:") {
                     lines.append(&mut vec![line.to_string()]);
                 }
             }
@@ -104,76 +105,68 @@ impl AssFile {
             }
         }
 
-        for line in events {
-            let mut font = String::new();
-            let mut bold: bool = false;
-            let mut bold_check: bool = false;
-            let mut italic: bool = false;
-            let mut italic_check: bool = false;
-            let mut styled: bool = false;
-            let mut read_tag: bool = false;
+        fn get_tags(line: String) -> Option<Vec<String>> {
+            let mut styles: Vec<String> = vec![];
             let mut record: bool = false;
-            for ch in line.chars() {
-                if italic_check || bold_check {
-                    if italic_check {
-                        if ch == '0' {
-                            italic = false
-                        } else if ch == '1' {
-                            italic = true
-                        }
-                    } else {
-                        if ch == '0' {
-                            bold = false
-                        } else if ch == '1' {
-                            bold = true
-                        }
-                    }
-                    (italic_check, bold_check) = (false, false);
-                    continue
-                } else if read_tag && ch == 'f' {
-                    continue
-                } else if read_tag && ch == 'n' {
+            let mut temp: String = String::new();
+            for character in line.chars() {
+                if character == '{' {
                     record = true;
-                    read_tag = false;
                     continue;
-                } else if read_tag && ch == 'i' {
-                    italic_check = true
-                } else if read_tag && ch == 'b' {
-                    bold_check = true
-                } else {
-                    read_tag = false;
+                } else if character == '}' {
+                    record = false;
+                    styles.append(&mut vec![temp.clone()]);
+                    temp.clear();
+                    continue;
                 }
-                if ch == '{' || ch == '}' {
-                    if styled {
-                        if ! font.is_empty() {
-                            let assfont = AssFont {
-                                facename: font.clone(),
+                if record {
+                    temp.push_str(character.to_string().as_str())
+                }
+            };
+            let mut tags: Vec<String> = vec![];
+            for style in styles {
+                let splits = style.split_terminator("\\");
+                for str in splits {
+                    tags.append(&mut vec![("\\".to_owned() + str).to_string()]);
+                }
+            };
+            Some(tags)
+        }
+        
+        for line in events {
+            if line.contains(r#"\fn"#) {
+                let tags = get_tags(line);
+                if tags.is_some() {
+                    let mut bold: bool = false;
+                    let mut italic: bool = false;
+                    for tag in tags.unwrap() {
+                        if tag == "\\b1" {
+                            bold = true;
+                        } else if tag == "\\b0" {
+                            bold = false;
+                        } else if tag == "\\i1" {
+                            italic = true;
+                        } else if tag == "\\i0" {
+                            italic = false;
+                        } else if tag.starts_with("\\fn") {
+                            let font_str = tag.trim_start_matches("\\fn");
+                            fonts.append(&mut vec![AssFont {
+                                facename: font_str.to_string(),
                                 bold,
                                 italic,
                                 path: "".to_string()
-                            };
-                            if ! fonts.contains(&assfont) {
-                                fonts.append(&mut vec![assfont]);
-                            }
-                            font.clear()
+                            }]);
+                            bold = false;
+                            italic = true;
                         }
-                        styled = false
-                    } else {
-                        styled = true
                     }
+                } else {
                     continue
                 }
-                if ch == '\\' {
-                    if ! font.is_empty() {
-                        record = false;
-                    }
-                    read_tag = true;
-                }
-                if record {
-                    font.push_str(ch.to_string().as_str());
-                }
+            } else {
+                continue
             }
-        }
+        };
         if ! fonts.is_empty() {
             Ok(fonts)
         } else {
