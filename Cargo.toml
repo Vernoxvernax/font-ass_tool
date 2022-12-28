@@ -1,11 +1,10 @@
 [package]
 name = "fa_tool"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.0.0-rc.2", features = ["derive"] }
-serde = "1.0.145"
+clap = { version = "4.0.29", features = ["derive"] }
+serde = "1.0.151"
 servo-fontconfig = "0.5.1"
 walkdir = "2.3.2"
-

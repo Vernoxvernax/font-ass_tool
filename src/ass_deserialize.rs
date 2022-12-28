@@ -1,7 +1,7 @@
 use std::vec;
 use crate::error::Error;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct AssFont {
     pub facename: String,
     pub bold: bool,
@@ -9,7 +9,7 @@ pub struct AssFont {
     pub path: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AssFile {
     pub fonts: Vec<AssFont>
 }
@@ -21,41 +21,37 @@ impl AssFile {
         
         let font_trim = Self::trim_to_fonts(styles, events);
         let fonts = font_trim.expect("Failed to trim to font_names");
-        Ok(AssFile {fonts: fonts})
+        Ok(AssFile {fonts})
     }
 
-    fn get_styles(f: &String) -> Result<Vec<String>, Error> {
+    fn get_styles(f: &str) -> Result<Vec<String>, Error> {
         let mut header: Option<String> = None;
         let mut lines: Vec<String> = vec![];
         for line in f.lines() {
-            if line.starts_with("[") && line.ends_with("]") && line.contains("Styles") {
+            if line.starts_with('[') && line.ends_with(']') && line.contains("Styles") {
                 header = Some(line.to_string());
                 continue
             }
-            if line.starts_with("[") && line.ends_with("]") && line.contains("Events") {
+            if line.starts_with('[') && line.ends_with(']') && line.contains("Events") {
                 return Ok(lines)
             }
-            if header.is_some() {
-                if ! line.is_empty() && ! line.starts_with("Format:") {
-                    lines.append(&mut vec![line.to_string()]);
-                }
+            if header.is_some() && ! line.is_empty() && ! line.starts_with("Format:") {
+                lines.append(&mut vec![line.to_string()]);
             }
         }
         Err(Error::MissingStylesInfo)
     }
 
-    fn get_event_lines(f: &String) -> Result<Vec<String>, Error> {
+    fn get_event_lines(f: &str) -> Result<Vec<String>, Error> {
         let mut header: Option<String> = None;
         let mut lines: Vec<String> = vec![];
         for line in f.lines() {
-            if line.starts_with("[") && line.ends_with("]") && line.contains("Events") {
+            if line.starts_with('[') && line.ends_with(']') && line.contains("Events") {
                 header = Some(line.to_string());
                 continue
             }
-            if header.is_some() {
-                if ! line.is_empty() && ! line.starts_with("Format:") && ! line.starts_with("Comment:") {
-                    lines.append(&mut vec![line.to_string()]);
-                }
+            if header.is_some() && ! line.is_empty() && ! line.starts_with("Format:") && ! line.starts_with("Comment:") {
+                lines.append(&mut vec![line.to_string()]);
             }
         }
         if ! lines.is_empty() {
@@ -125,7 +121,7 @@ impl AssFile {
             };
             let mut tags: Vec<String> = vec![];
             for style in styles {
-                let splits = style.split_terminator("\\");
+                let splits = style.split_terminator('\\');
                 for str in splits {
                     tags.append(&mut vec![("\\".to_owned() + str).to_string()]);
                 }
@@ -136,10 +132,10 @@ impl AssFile {
         for line in events {
             if line.contains(r#"\fn"#) {
                 let tags = get_tags(line);
-                if tags.is_some() {
+                if let Some(tagged) = tags {
                     let mut bold: bool = false;
                     let mut italic: bool = false;
-                    for tag in tags.unwrap() {
+                    for tag in tagged {
                         if tag == "\\b1" {
                             bold = true;
                         } else if tag == "\\b0" {
@@ -150,12 +146,15 @@ impl AssFile {
                             italic = false;
                         } else if tag.starts_with("\\fn") {
                             let font_str = tag.trim_start_matches("\\fn");
-                            fonts.append(&mut vec![AssFont {
+                            let assfont = AssFont {
                                 facename: font_str.to_string(),
                                 bold,
                                 italic,
                                 path: "".to_string()
-                            }]);
+                            };
+                            if ! fonts.contains(&assfont) {
+                                fonts.append(&mut vec![assfont]);
+                            }
                             bold = false;
                             italic = true;
                         }

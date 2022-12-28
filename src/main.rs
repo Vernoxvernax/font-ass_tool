@@ -1,16 +1,18 @@
 use std::fs;
 use std::path::Path;
-use std::ffi::{CString, CStr};
+use std::ffi::{CStr, c_void};
 use std::os::raw::c_char;
-use std::ptr::{null_mut};
-use std::str::from_utf8_unchecked;
+use std::ptr::null_mut;
+use std::process::exit;
 use ass_deserialize::AssFont;
 use clap::{Arg, Command, ArgAction};
 use walkdir::WalkDir;
 use fontconfig::fontconfig::{
-    FcMatchPattern, FcResultMatch, FcChar8, FcBool, FcConfig,
-    FcPatternFormat, FcNameParse, FcFontMatch, FcConfigSubstitute, FcDefaultSubstitute, FcConfigGetCurrent, FcPatternAddBool
+    FcMatchPattern, FcResultMatch, FcSetSystem, FcResult, FcChar8, FcBool, FcConfig, FcPattern, FcFontSet,
+    FcConfigSubstitute, FcDefaultSubstitute, FcPatternAddBool, FcFontSetAdd, FcPatternDuplicate, FcPatternGetString, FcFontSetSort,  FcPatternDestroy, FcConfigDestroy,
+    FcPatternCreate, FcPatternAddInteger, FcConfigBuildFonts, FcInitLoadConfig, FcFontSetCreate, FcConfigGetFonts, FcPatternGetBool, FcFontSetDestroy,
 };
+
 pub mod ass_deserialize;
 pub mod error;
 use crate::ass_deserialize::AssFile;
@@ -56,10 +58,14 @@ fn main() {
             let files = args.unwrap().map(|s| s.to_string()).collect::<Vec<_>>();
             let raw_files = to_file_list(files);
             let ass_files = deserialize(raw_files.clone());
-            for (file, name) in ass_files.iter().zip(raw_files.iter()) {
-                if remux_this(find_font_files(file.clone()), name.clone()).is_err() {
-                    println!("Failed to write {}:\n{:?}", name, file.fonts);
-                };
+            unsafe {
+                let config: *mut FcConfig = FcInitLoadConfig();
+                FcConfigBuildFonts(config);
+                for (file, name) in ass_files.iter().zip(raw_files.iter()) {
+                    if remux_this(find_font_files(file.clone(), config), name.clone()).is_err() {
+                        println!("Failed to write {}:\n{:?}", name, file.fonts);
+                    };
+                }
             }
         },
         Some(("check", check_matches)) => {
@@ -67,85 +73,129 @@ fn main() {
             let files = args.unwrap().map(|s| s.to_string()).collect::<Vec<_>>();
             let raw_files = to_file_list(files);
             let ass_files = deserialize(raw_files.clone());
-            for (file, name) in ass_files.iter().zip(raw_files.iter()) {
-                println!("{}:", name.clone());
-                for (font_file, assfont) in find_font_files(file.clone()).fonts.iter().zip(file.fonts.iter()) {
-                    println!("  {}      (b: {} i: {})       => {}", assfont.facename, assfont.bold, assfont.italic , font_file.path);
-                };
-                println!("");
+            unsafe {
+                let config: *mut FcConfig = FcInitLoadConfig();
+                FcConfigBuildFonts(config);
+                for (file, name) in ass_files.iter().zip(raw_files.iter()) {
+                    println!("{}:", name.clone());
+                    for font_file in find_font_files(file.clone(), config).fonts.iter() {
+                        println!("  {}      (b: {} i: {})       => {}", font_file.facename, font_file.bold, font_file.italic , font_file.path);
+                    };
+                    println!();
+                }
+                FcConfigDestroy(config);
             }
         }
         _ => unreachable!(),
     }
 }
 
-fn find_font_files(file: &AssFile) -> AssFile {
+static FC_OUTLINE: &[u8] = b"outline\0";
+static FC_FULLNAME: &[u8] = b"fullname\0";
+static FC_FAMILY: &[u8] = b"family\0";
+static FC_FILE: &[u8] = b"file\0";
+static FC_WEIGHT: &[u8] = b"weight\0";
+static FC_SLANT: &[u8] = b"slant\0";
+
+fn find_font_files(file: AssFile, config: *mut FcConfig) -> AssFile {
     let mut fonts: Vec<AssFont> = vec![];
-    let default_font = get_fallback_font();
     for font in &file.fonts {
         let mut assfont = font.clone();
-        let mut font_name = font.facename.replace("@", "");
-        loop {
-            let cstr_font = CString::new(&*font_name).unwrap();
-            unsafe {
-                let pattern = FcNameParse(cstr_font.as_ptr() as *mut FcChar8);
-                FcPatternAddBool(pattern, "FC_OUTLINE".as_ptr() as *const i8, true as FcBool);
-                FcConfigSubstitute(null_mut(), pattern, FcMatchPattern);
-                FcDefaultSubstitute(pattern);
-                let mut result = 0;
-                let fontmatch = FcFontMatch(null_mut(), pattern, &mut result);
-                if result == FcResultMatch {
-                    let oformat = CString::new("%{file}").unwrap();
-                    let fonting = FcPatternFormat(fontmatch, oformat.as_ptr() as *const u8);
-                    let string = CStr::from_ptr(fonting as *const c_char).to_bytes_with_nul();
-                    assfont.path = from_utf8_unchecked(string).replace("\0", "").trim().to_string();
-                } else {
-                    panic!("No match has been found for {}", font.facename);
-                };
-                if assfont.path == default_font {
-                    if font_name.ends_with("Condensed")
-                    || font_name.ends_with("Bold")
-                    || font_name.ends_with("Italic")
-                    || font_name.ends_with("Semi")
-                    || font_name.ends_with("Extra")
-                    || font_name.ends_with("Light") {
-                        font_name = font_name.trim_end_matches("Condensed").trim().to_string();
-                        font_name = font_name.trim_end_matches("Bold").trim().to_string();
-                        font_name = font_name.trim_end_matches("Semi").trim().to_string();
-                        font_name = font_name.trim_end_matches("Italic").trim().to_string();
-                        font_name = font_name.trim_end_matches("Light").trim().to_string();
-                        font_name = font_name.trim_end_matches("Extra").trim().to_string();
-                    } else {
-                        fonts.append(&mut vec![assfont]);
-                        break
-                    }
-                } else {
-                    fonts.append(&mut vec![assfont]);
-                    break
-                }
+        let clear_facename: &str = if font.facename.chars().nth(1).unwrap() == '@' {
+            &font.facename[1..]
+        } else {
+            &font.facename
+        };
+
+        let family = clear_facename.to_lowercase();
+
+        let weight: i32 = if font.bold {
+            200
+        } else {
+            80
+        };
+
+        let slant: i32 = if font.italic {
+            110
+        } else {
+            0
+        };
+
+        unsafe {
+            let pattern = FcPatternCreate() as *mut FcPattern;
+
+            FcPatternAddBool(pattern, FC_OUTLINE.as_ptr() as *mut c_char, true as FcBool);
+            FcPatternAddInteger(pattern, FC_SLANT.as_ptr() as *mut c_char, slant);
+            FcPatternAddInteger(pattern, FC_WEIGHT.as_ptr() as *mut c_char, weight);
+            FcDefaultSubstitute(pattern);
+
+            if ! FcConfigSubstitute(config, pattern, FcMatchPattern) == 1 {
+                continue;
             }
+
+            let fset: *mut FcFontSet = FcFontSetCreate();
+            fcfind(FcConfigGetFonts(config, FcSetSystem), fset, &family);
+            
+            let result: *mut FcResult = &mut 0;
+            let mut sets: *mut FcFontSet = { fset };
+
+            let matches: *mut FcFontSet = FcFontSetSort(config, &mut sets, 1, pattern, 0, std::ptr::null_mut(), result);
+            if (*matches).nfont == 0 {
+                assfont.path = "Nothing found.".to_string();
+                fonts.append(&mut vec![assfont]);
+                continue;
+            };
+
+            FcFontSetDestroy(fset);
+            FcPatternDestroy(pattern);
+
+            let matching = *(*matches).fonts.offset(0);
+            
+            let mut file: *mut FcChar8 = &mut 0;
+            if FcPatternGetString(matching, FC_FILE.as_ptr() as *mut c_char, 0, &mut file) != FcResultMatch {
+                continue;
+            }
+
+            assfont.path = std::str::from_utf8(CStr::from_ptr(file as *const c_char).to_bytes()).unwrap().to_owned();
+            fonts.append(&mut vec![assfont]);
+            FcFontSetDestroy(matches);
         }
     };
     AssFile { fonts }
 }
 
-fn get_fallback_font() -> String {
-    unsafe {
-        let config: *mut FcConfig = FcConfigGetCurrent();
-        let default_pattern = FcNameParse("".as_ptr() as *mut FcChar8);
-        FcDefaultSubstitute(default_pattern);
-        FcConfigSubstitute(config, default_pattern, FcMatchPattern);
-        let mut result = 0;
-        let fontmatch = FcFontMatch(null_mut(), default_pattern, &mut result);
-        if result == FcResultMatch {
-            let oformat = CString::new("%{file}").unwrap();
-            let fonting = FcPatternFormat(fontmatch, oformat.as_ptr() as *const u8);
-            let string = CStr::from_ptr(fonting as *const c_char).to_bytes_with_nul();
-            let default_font = from_utf8_unchecked(string).replace("\0", "").trim().to_string();
-            default_font
-        } else {
-            "Arial".to_string()
+fn fcfind(src: *mut FcFontSet, fset: *mut FcFontSet, family: &String) {
+    unsafe {       
+        for i in 0..((*src).nfont as isize) {
+            let pattern: *mut FcPattern = *(*src).fonts.offset(i);
+            let mut value = 0;
+            let val: *mut FcBool = &mut value;
+        
+            if FcPatternGetBool(pattern, FC_OUTLINE.as_ptr() as *mut c_char, 0, val) != FcResultMatch || *val != 1 {
+                continue;
+            };
+            
+            if pattern_match(pattern, FC_FULLNAME, family) || pattern_match(pattern, FC_FAMILY, family) {
+                FcFontSetAdd(fset, FcPatternDuplicate(pattern));
+            };
         }
+    }
+}
+
+fn pattern_match(pat: *mut c_void, field: &'static [u8], name: &String) -> bool {
+    unsafe {
+        for index in 0.. {
+            let mut str: *mut FcChar8 = null_mut();
+            if FcPatternGetString(pat, field.as_ptr() as *mut c_char, index, &mut str) == FcResultMatch {
+                let sstr: &String = &std::str::from_utf8(CStr::from_ptr(str as *const c_char).to_bytes()).unwrap().to_owned().to_lowercase();
+                if name == sstr {
+                    return true;
+                }
+            } else {
+                return false;
+            }
+        }
+        false
     }
 }
 
@@ -166,20 +216,20 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-font";
         } else if assfont.path.ends_with(".otf") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-font-opentype";
-        } else if assfont.path.ends_with("ttc") {
+        } else if assfont.path.ends_with(".ttc") {
             cmd = cmd.to_owned() + " -metadata:s:" + track_index.to_string().as_str() + " mimetype=application/x-truetype-collection";
         }
         track_index += 1;
         duppl_check.push_str(&assfont.path);
     };
     cmd = cmd.to_owned() + " " + name.as_str() + ".mkv -n";
-    let arg = format!("{}", cmd);
-    let args: Vec<&str> = arg.split(" ").collect();
+    let arg = cmd;
+    let args: Vec<&str> = arg.split(' ').collect();
     let result = std::process::Command::new("ffmpeg").args(args).output().unwrap();
     match result.status.success() {
         true => Ok(()),
         false => {
-                let err = name + ".mkv couldn't not be written.";
+                let err = name + ".mkv couldn't be written.";
                 Err(err)
             }
     }
@@ -203,7 +253,8 @@ fn to_file_list(input: Vec<String>) -> Vec<String> {
     let mut file_list: Vec<String> = vec![];
     for x in input {
         if ! Path::new(&x).exists() {
-            panic!("\"{}\" does not exist!", x);
+            println!("\"{}\" does not exist!", x);
+            exit(1);
         }
         for f in WalkDir::new(&x)
             .into_iter()

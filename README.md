@@ -21,18 +21,18 @@ ___
 
 ### **Notes:**
 
-+ This programm does **NOT** check whether the required fonts are installed.
-It only parses the subtitle file, asks fontconfig for a matching font and muxes them into one file.
-+ The mkv output is not a playable file, it's only made for an easier remuxing progress. !mpv options like `external-file` are not supported!
-    * This also affects mpv. If your subtitle file doesn't start at time 0, this will lead to playback issues. (mpv will always skips to the beginning of the file)
+This script parses the subtitle file, asks fontconfig for a matching font and muxes them into one file.
++ The mkv output is not a playable file, it's only made for an easier remuxing progress. (mpv options like `external-file` are not supported)
+    * This affects all ffmpeg based applications. If your subtitle file doesn't start at time 0, this will lead to playback issues. (mpv will always skip to the beginning of the first track)
     * Hint: mux a video track into the container or play the subtitle file externally
-+ ffmpeg is run with `overwrite` disabled
++ ffmpeg is run with `overwrite` disabled, but without any bindings. Because of constant linking problems I decided to just run ffmpeg commands so just make sure ffmpeg is in your PATH.
 
 ___
 
-### **Problems:**
+### **~~Problems~~:**
 
-Tests have revealed that fontconfig's `fc-match` isn't as flawless as initially thought. Fonts with a lot of complex styles rarely get matched correctly. You can manually check the matches using the `check` option.
-In `0.1.3` I've implemented a few loops that basically trim common words like `Bold` or `Light` off the fontnames if the matched fontpath equals the one of the default one.
+I got angry, learned C++ and searched Github. After a while I found that Aegisub's font collector almost (liability) perfectly matches all font names you feed into it, so decided to translate parts of it's `font_file_lister_fontconfig.cpp` file to rust, which finally also gives me the option to add "warnings" when a font has not been found. (indicated by the font path = `Not found`). This code should be able to handle all correctly formated ASS subtitle files.
+
+Have fun.
 
 ___
