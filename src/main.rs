@@ -1,9 +1,9 @@
-use std::fs;
+use std::{fs, vec};
 use std::path::Path;
 use std::ffi::{CStr, c_void};
 use std::os::raw::c_char;
 use std::ptr::null_mut;
-use std::process::exit;
+use std::process::{exit, ExitCode};
 use ass_deserialize::AssFont;
 use clap::{Arg, Command, ArgAction};
 use walkdir::WalkDir;
@@ -18,7 +18,7 @@ pub mod error;
 use crate::ass_deserialize::AssFile;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn main() {
+fn main() -> ExitCode {
     let matches = Command::new("fa_tool")
         .about("easily batch through subtitles and its dependencies")
         .version(VERSION)
@@ -29,7 +29,7 @@ fn main() {
             Command::new("run")
             .short_flag('r')
             .long_flag("run")
-            .about("Analyze a subtitle file written in ASS, and mux the required fonts into a matroska container.")
+            .about("Analyze a subtitle file written in ASS, and mux it with the required fonts into a matroska container.")
             .arg(
                 Arg::new("file")
                     .help("list of files or folders")
@@ -62,10 +62,13 @@ fn main() {
                 let config: *mut FcConfig = FcInitLoadConfig();
                 FcConfigBuildFonts(config);
                 for (file, name) in ass_files.iter().zip(raw_files.iter()) {
-                    if remux_this(find_font_files(file.clone(), config), name.clone()).is_err() {
-                        println!("Failed to write {}:\n{:?}", name, file.fonts);
+                    if let Err(err) = remux_this(find_font_files(file.clone(), config), name.clone()) {
+                        println!("Error occurred for {}:\n  {}", name, err);
+                        return ExitCode::FAILURE;
                     };
                 }
+                FcConfigDestroy(config);
+                return ExitCode::SUCCESS;
             }
         },
         Some(("check", check_matches)) => {
@@ -84,6 +87,7 @@ fn main() {
                     println!();
                 }
                 FcConfigDestroy(config);
+                return ExitCode::SUCCESS;
             }
         }
         _ => unreachable!(),
@@ -205,11 +209,17 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
         return Ok(());
     }
     let mut duppl_check = String::new();
-    let mut cmd = "-i ".to_owned() + name.as_str();
+    let mut args: Vec<&str> = vec![];
+    args.append(&mut vec!["-i"]);
+    let input = name.clone();
+    args.append(&mut vec![&input]);
+    let mut cmd = "".to_string();
     let mut track_index = 1;
     for assfont in file.fonts {
         if duppl_check.contains(&assfont.path) {
             continue
+        } else if assfont.path == "Nothing found." {
+            return Err(format!("\"{}\" could not be found on your system.", assfont.facename));
         }
         cmd = cmd.to_owned() + " -attach " + assfont.path.as_str();
         if assfont.path.ends_with(".ttf") {
@@ -222,15 +232,17 @@ fn remux_this(file: AssFile, name: String) -> Result<(), String> {
         track_index += 1;
         duppl_check.push_str(&assfont.path);
     };
-    cmd = cmd.to_owned() + " " + name.as_str() + ".mkv -n";
-    let arg = cmd;
-    let args: Vec<&str> = arg.split(' ').collect();
+    let output = name + ".mkv";
+    cmd = cmd.trim().to_string();
+    args.append(&mut cmd.split(' ').collect());
+    args.append(&mut vec![&output]);
+    args.append(&mut vec!["-n"]);
+    // println!("{:?}", args);
     let result = std::process::Command::new("ffmpeg").args(args).output().unwrap();
     match result.status.success() {
         true => Ok(()),
         false => {
-                let err = name + ".mkv couldn't be written.";
-                Err(err)
+                Err(String::from_utf8(result.stderr).unwrap())
             }
     }
 }

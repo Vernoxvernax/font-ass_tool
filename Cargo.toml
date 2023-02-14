@@ -4,7 +4,7 @@ version = "0.1.5"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.0.29", features = ["derive"] }
-serde = "1.0.151"
+clap = { version = "4.1.4", features = ["derive"] }
+serde = "1.0.152"
 servo-fontconfig = "0.5.1"
 walkdir = "2.3.2"
