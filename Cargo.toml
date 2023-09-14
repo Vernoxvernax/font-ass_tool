@@ -1,10 +1,10 @@
 [package]
 name = "fa_tool"
-version = "0.1.5"
+version = "0.1.7"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.1.4", features = ["derive"] }
-serde = "1.0.152"
-servo-fontconfig = "0.5.1"
-walkdir = "2.3.2"
+clap = "4.4.3"
+serde = "1.0.188"
+walkdir = "2.4.0"
+yeslogic-fontconfig-sys = { git = "https://github.com/Vernoxvernax/fontconfig-rs.git" }

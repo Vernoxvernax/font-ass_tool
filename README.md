@@ -1,6 +1,6 @@
 ## **Font-Ass_Tool**
 
-#### A simple small utility to mux a subtitle file with it's font dependencies into a matroska container
+#### A simple small utility to mux a subtitle file with its font dependencies into a Matroska-Container
 
 ___
 
@@ -22,17 +22,20 @@ ___
 ### **Notes:**
 
 This script parses the subtitle file, asks fontconfig for a matching font and muxes them into one file.
-+ The mkv output is not a playable file, it's only made for an easier remuxing progress. (mpv options like `external-file` are not supported)
-    * This affects all ffmpeg based applications. If your subtitle file doesn't start at time 0, this will lead to playback issues. (mpv will always skip to the beginning of the first track)
-    * Hint: mux a video track into the container or play the subtitle file externally
-+ ffmpeg is run with `overwrite` disabled, but without any bindings. Because of constant linking problems I decided to just run ffmpeg commands so just make sure ffmpeg is in your PATH.
++ The mkv output is not a playable file, it's only made for an easier remuxing progress. (MPV options like `external-file` are not supported)
+    * This affects all FFmpeg based applications. If your subtitle file doesn't start at time 0, it won't play as expected. (MPV will always skip to the beginning of the first track)
+    * Hint: put a video track into the container, or play the subtitle file externally
++ FFmpeg is run with `overwrite` disabled by default. 
 
 ___
 
-### **~~Problems~~:**
+### **_Problems_:**
 
-I got angry, learned C++ and searched Github. After a while I found that Aegisub's font collector almost (liability) perfectly matches all font names you feed into it, so decided to translate parts of it's `font_file_lister_fontconfig.cpp` file to rust, which finally also gives me the option to add "warnings" when a font has not been found. (indicated by the font path = `Not found`). This code should be able to handle all correctly formated ASS subtitle files.
+I got angry, learned C++ and searched GitHub. After a while I found that Aegisub's font collector almost perfectly matches all font names you feed into it, so I decided to translate parts of it's `font_file_lister_fontconfig.cpp` file to rust. We thus also finally have "warnings" when a font couldn't be found. (indicated by the font path = `Not found`).
 
-Have fun.
+~~This code should be able to handle all correctly formatted ASS subtitle files.~~ 
+
+If there is anyone who knows how to get a correct match for fonts like `Bahnschrift`, then please create an issue, or reach out to me on Discord!
+
 
 ___
