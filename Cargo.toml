@@ -9,5 +9,6 @@ serde = "1.0.188"
 walkdir = "2.4.0"
 yeslogic-fontconfig-sys = { git = "https://github.com/Vernoxvernax/fontconfig-rs.git" }
 
-# [features]
-# default = [ "yeslogic-fontconfig-sys/dlopen" ]
+[features]
+# default = [ "dlopen" ] # Uncomment this line for windows compiling. (idk how write build.rs yet)
+dlopen = [ "yeslogic-fontconfig-sys/dlopen" ]
