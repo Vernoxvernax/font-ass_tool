@@ -6,17 +6,55 @@ ___
 
 ### **Installation:**
 
+#### **Linux:**
+___
+
 Make sure you have the following software already installed:
 + fontconfig
-+ ffmpeg
-+ cargo + rust (for compiling)
++ FFmpeg
++ cargo + rust
 
 ```
 cargo install --path .
 export PATH="$HOME/.cargo/bin:$PATH"
+```
+
+
+#### **Windows (by compiling and linking to fontconfig):**
+___
+
+Make sure you have some version of Visual Studio installed (tested with 2022 Community).
+
+Additional requirements:
++ meson
++ ninja
++ git
++ FFmpeg
++ cargo + rust (for compiling)
++ brain
+
+Read and run `build_fontconfig.bat`.
+
+Now run `cargo build --release`.
+
+Read and run `copy_dlls.bat` (unless you want to add three different folders to your path).
+
+Any tips on how to improve the `dll` situation are very welcome.
+
+#### **Dlopen:**
+___
+
+I don't really know (or care) what this feature is supposed to be useful for, but it requires `pkg-config`. So pretty painful to set up on Windows (MSYS).
+
+### **Usage:**
+
+```
 fa_tool check subtitle.ass
 fa_tool run subtitle.ass
 ```
+
+Replace `fa_tool` with `cargo run --release --` when on Windows.
+
 ___
 
 ### **Notes:**

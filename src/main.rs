@@ -12,13 +12,13 @@ use fontconfig_sys::{
   FcMatchPattern, FcResultMatch, FcSetSystem, FcResult, FcChar8, FcBool, FcConfig, FcPattern, FcFontSet, ffi_dispatch
 };
 
-#[cfg(not(windows))]
+#[cfg(not(feature = "dlopen"))]
 use fontconfig_sys::{
   FcConfigSubstitute, FcDefaultSubstitute, FcPatternAddBool, FcFontSetAdd, FcPatternDuplicate, FcPatternGetString, FcFontSetSort,  FcPatternDestroy, FcConfigDestroy,
   FcPatternCreate, FcPatternAddInteger, FcConfigBuildFonts, FcInitLoadConfig, FcFontSetCreate, FcConfigGetFonts, FcPatternGetBool, FcFontSetDestroy, FcWeightFromOpenType,
 };
 
-#[cfg(windows)]
+#[cfg(feature = "dlopen")]
 use fontconfig_sys::statics::LIB;
 
 pub mod ass_deserialize;
