@@ -8,3 +8,6 @@ clap = "4.4.3"
 serde = "1.0.188"
 walkdir = "2.4.0"
 yeslogic-fontconfig-sys = { git = "https://github.com/Vernoxvernax/fontconfig-rs.git" }
+
+# [features]
+# default = [ "yeslogic-fontconfig-sys/dlopen" ]
