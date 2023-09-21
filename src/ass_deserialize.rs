@@ -52,12 +52,11 @@ impl AssFile {
     let mut header: Option<String> = None;
     let mut lines: Vec<String> = vec![];
     for line in f.lines() {
-      if line.starts_with('[') && line.ends_with(']') && line.contains("Events") {
+      if line.starts_with('[') && line.ends_with(']') {
         header = Some(line.to_string());
-        continue
-      }
-      if header.is_some() && ! line.is_empty() && ! line.starts_with("Format:") && ! line.starts_with("Comment:") {
+      } else if header == Some("[Events]".to_string()) && ! line.is_empty() && ! line.starts_with("Format:") && ! line.starts_with("Comment:") {
         lines.append(&mut vec![line.to_string()]);
+        continue;
       }
     }
     if ! lines.is_empty() {
@@ -115,20 +114,24 @@ impl AssFile {
     
     for line in events {
       let mut style_name: String = String::new();
+      let mut facename: String = String::new();
       let mut comma_ed: u8 = 0;
+      let mut bold: bool = false;
+      let mut italic: bool = false;
       for ch in line.chars() {
         if ch == ',' {
           comma_ed += 1;
           
           if comma_ed == 4 {
-            for style in styles.clone() {
-              if style.name == style_name {
-                if ! fonts.contains(&style.font) {
-                  fonts.append(&mut vec![style.font]);
-                }
-              }
-            }
-  
+            let style = if let Some(style) = styles.iter().find(| s | s.name == style_name) {
+              style
+            } else {
+              println!("fdasfs");
+              styles.get(0).unwrap()
+            };
+            facename = style.font.facename.clone();
+            bold = style.font.bold;
+            italic = style.font.italic;
             break;
           }
         } else if comma_ed == 3 {
@@ -136,40 +139,51 @@ impl AssFile {
         }
       }
 
-      if line.contains(r#"\fn"#) {
-        let tags = get_tags(line);
+      if facename == "" {
+        println!("{}", line);
+      }
+
+      if line.contains(r#"\fn"#) || line.contains(r#"\i"#) || line.contains(r#"\b"#) {
+        let tags = get_tags(line.clone());
         if let Some(tagged) = tags {
-          let mut bold: bool = false;
-          let mut italic: bool = false;
           for tag in tagged {
             if tag == "\\b1" {
               bold = true;
             } else if tag == "\\b0" {
               bold = false;
-            } else if tag == "\\i1" {
+            } else if tag == r#"\i1"# {
               italic = true;
-            } else if tag == "\\i0" {
+            } else if tag == r#"\i0"# {
               italic = false;
             } else if tag.starts_with("\\fn") {
-              let font_str = tag.trim_start_matches("\\fn");
-              let assfont = AssFont {
-                facename: font_str.to_string(),
-                bold,
-                italic,
-                path: "".to_string()
-              };
-              if ! fonts.contains(&assfont) {
-                fonts.append(&mut vec![assfont]);
-              }
-              bold = false;
-              italic = true;
+              facename = tag.trim_start_matches("\\fn").to_string();
             }
+          }
+
+          let assfont = AssFont {
+            facename: facename.to_string(),
+            bold,
+            italic,
+            path: "".to_string()
+          };
+
+          if ! fonts.contains(&assfont) {
+            fonts.append(&mut vec![assfont]);
           }
         } else {
           continue
         }
       } else {
-        continue
+        let assfont = AssFont {
+          facename: facename.to_string(),
+          bold,
+          italic,
+          path: "".to_string()
+        };
+
+        if ! fonts.contains(&assfont) {
+          fonts.append(&mut vec![assfont]);
+        }
       }
     };
 

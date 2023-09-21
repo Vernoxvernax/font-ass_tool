@@ -340,7 +340,7 @@ fn deserialize(files: Vec<String>) -> Vec<AssFile> {
     if ass.is_ok() {
       deserialized_files.append(&mut vec![ass.unwrap()]);
     } else {
-      println!("Failed to serialize: \"{}\".", x);
+      println!("Failed to deserialize: \"{}\".", x);
     }
   };
   deserialized_files
